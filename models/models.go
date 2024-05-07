@@ -12,9 +12,6 @@ type User struct {
 	Count   int
 }
 
-type Transaction struct {
-}
-
 type Event struct {
 	Hash        string `db:"hash"`
 	UserAddress string `db:"user_address"`
