@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -25,16 +26,19 @@ func main() {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
 	defer db.Close()
+
 	Repository := repository.NewRepository(db)
 	models.CreateEventsTable(db)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
+
 	client, err := ethclient.DialContext(ctx, url)
 	if err != nil {
 		log.Fatalf("Cannot create cleint: %s", err.Error())
 	}
 	defer client.Close()
+
 	c, _ := contract.NewContractFilterer(adressContract, client)
 	endBlock, _ := client.BlockNumber(ctx)
 	startBlock := endBlock - 1024
@@ -42,6 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	var events []models.Event
 	for f.Next() {
 		if f == nil {
@@ -50,29 +55,21 @@ func main() {
 		}
 		n := f.Event
 		txHash := n.Raw.TxHash
-		x, _, err := client.TransactionByHash(ctx, txHash)
 		if err != nil {
 			log.Fatal(err)
 		}
-		blockHash := n.Raw.BlockHash
-		v, _ := client.BlockByHash(ctx, blockHash)
-		// if v == nil {
-		// 	fmt.Println("block is nil")
-		// 	break
-		// }
-		fmt.Println("====")
-		fmt.Println("hash:", txHash)
-		fmt.Printf("time:%v\n", x.Time().UTC())
-		//fmt.Println("Time:", time.Unix(int64(v.Time()), 0))
-
-		fmt.Println(n.UserAddress)
-		fmt.Println(n.NftIds)
-		fmt.Println(n.UserNonce)
+		// blockHash := n.Raw.BlockHash
+		// block, _ := client.BlockByHash(ctx, blockHash)
 
 		var timeOf uint64
-		if v != nil {
-			timeOf = v.Time()
+
+		header, err := client.HeaderByNumber(ctx, big.NewInt(int64(n.Raw.BlockNumber)))
+		if err != nil {
+			fmt.Println("Ooops...")
+		} else {
+			timeOf = header.Time
 		}
+
 		events = append(events, models.ShapeEvent(fmt.Sprint(n.UserAddress), fmt.Sprint(n.NftIds), fmt.Sprint(n.UserNonce), fmt.Sprint(txHash), timeOf))
 
 	}
@@ -80,4 +77,9 @@ func main() {
 	if err != nil {
 		fmt.Errorf("Error occured while insertion:%v", err)
 	}
+	topUsers, err := Repository.GetTopVoters()
+	if err != nil {
+		fmt.Errorf("Error occured while retrieval:%v", err)
+	}
+	fmt.Println(topUsers)
 }

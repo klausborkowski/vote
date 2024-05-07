@@ -38,11 +38,32 @@ func (r *rep) InsertEvents(events []models.Event) error {
 }
 
 func (r *rep) GetTopVoters() (*[]models.User, error) {
-	// user := &models.User{}
-	// err := r.db.QueryRow("SELECT id, name, email FROM users WHERE id = $1", id).Scan(&user.ID, &user.Name, &user.Email)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return user, nil
-	return nil, nil
+	var users []models.User
+	query := `
+        SELECT user_address, MAX(CAST(user_nonce AS INTEGER)) AS count
+        FROM events
+        GROUP BY user_address
+        ORDER BY count DESC
+		LIMIT 10
+    `
+	rows, err := r.db.Queryx(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(&user.Address, &user.Count)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &users, nil
 }

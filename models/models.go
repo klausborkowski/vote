@@ -9,6 +9,7 @@ import (
 
 type User struct {
 	Address string
+	Count   int
 }
 
 type Transaction struct {
